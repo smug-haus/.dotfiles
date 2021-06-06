@@ -124,4 +124,4 @@ function _update_ps1() {
 if [ "$TERM" != "linux" ] && [ -f "$GOPATH/bin/powerline-go" ]; then
 	    PROMPT_COMMAND="_update_ps1; $PROMPT_COMMAND"
 fi
-dotfiles-git='/usr/bin/git --git-dir=/home/brentw/.dotfiles.git/ --work-tree=/home/brentw'
+dotfiles-git='/usr/bin/git --git-dir=$HOME/.dotfiles.git/ --work-tree=$HOME'
