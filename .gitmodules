@@ -1,0 +1,7 @@
+[submodule "spacemacs.d"]
+	path = .spacemacs.d
+	url = git@github.com:smug-haus/spacemacs.d.git
+[submodule ".emacs.d"]
+	path = .emacs.d
+	url = git@github.com:smug-haus/spacemacs.git
+	branch = develop
