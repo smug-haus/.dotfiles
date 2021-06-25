@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+XAUTHORITY=/tmp/.docker.xauth
+XSOCKET=/tmp/.X11-unix
+HOME=${HOME:-/home/${USER}}
+
+test -f ${XAUTHORITY} && true || touch ${XAUTHORITY}
+
+OPTS="-v ${HOME}:${HOME} \
+     $( test -d ${XSOCKET} && echo -v ${XSOCKET}:${XSOCKET}:rw ) \
+     $( test -f ${XAUTHORITY} && echo -v ${XAUTHORITY}:${XAUTHORITY}:ro ) \
+     -e XAUTHORITY=${XAUTHORITY} \
+     --user=$(id -un):$(id -gn) \
+     "
+
+>&2 echo Getting image
+IMAGES=( $(docker image ls --filter "reference=*emacs*" -q) )
+
+>&2 echo Looking for container
+CONTAINER=$(docker container ls -q -a --last=-1 ${IMAGES[@]/#/--filter ancestor=})
+test -z "${CONTAINER}" && CONTAINER=$(docker container run -d ${OPTS} ${IMAGES})
+
+eval $(docker container inspect ${CONTAINER} --format='{{with .State}}PAUSED={{.Paused}} RUNNING={{.Running}}{{end}}')
+eval ${RUNNING} || ( printf "Starting container..."  && docker container start   ${CONTAINER} )
+eval ${PAUSED}  && ( printf "Unpausing container..." && docker container unpause ${CONTAINER} )
+
+xauth nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTHORITY} nmerge -
+
+docker exec -it --env="DISPLAY" --env="XAUTHORITY=${XAUTHORITY}"  ${CONTAINER}  /usr/bin/emacsclient -c $@ 
+
