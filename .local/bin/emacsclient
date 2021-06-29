@@ -1,34 +1,66 @@
 #!/usr/bin/env bash
+set -e 
 
-if [ -n $(which emacsclient) ]; then
-  $(which emacs) $@
-else
+trap 'PREV=${THIS}; THIS=${BASH_COMMAND}' DEBUG
 
-	XAUTHORITY=/tmp/.docker.xauth
-	XSOCKET=/tmp/.X11-unix
-	HOME=${HOME:-/home/${USER}}
+SCRIPT=$( basename $0 )
 
-	test -f ${XAUTHORITY} && true || touch ${XAUTHORITY}
+status(){
+ echo "${SCRIPT}: $*"
+}
 
-	OPTS="-v ${HOME}:${HOME} \
-		$( test -d ${XSOCKET} && echo -v ${XSOCKET}:${XSOCKET}:rw ) \
-		$( test -f ${XAUTHORITY} && echo -v ${XAUTHORITY}:${XAUTHORITY}:ro ) \
-		-e XAUTHORITY=${XAUTHORITY} \
-		--user=$(id -un):$(id -gn) \
-		"
+error_exit(){
+  if [ $? -ne "0" ]; then
+    status "${PREV} failed with exit code $? $(kill -l ${SIG})"
+    exit 1
+  fi
+}
 
-	>&2 echo Getting image
-	IMAGES=( $(docker image ls --filter "reference=*emacs*" -q) )
+trap error_exit EXIT
 
-	>&2 echo Looking for container
-	CONTAINER=$(docker container ls -q -a --last=-1 ${IMAGES[@]/#/--filter ancestor=})
-	test -z "${CONTAINER}" && CONTAINER=$(docker container run -d ${OPTS} ${IMAGES})
 
-	eval $(docker container inspect ${CONTAINER} --format='{{with .State}}PAUSED={{.Paused}} RUNNING={{.Running}}{{end}}')
-	eval ${RUNNING} || ( printf "Starting container..."  && docker container start   ${CONTAINER} )
-	eval ${PAUSED}  && ( printf "Unpausing container..." && docker container unpause ${CONTAINER} )
+XAUTHORITY=/tmp/.docker.xauth
+XSOCKET=/tmp/.X11-unix
+DISPLAY=$(expr "$DISPLAY" : '.*\(:.*\)')
+HOME=${HOME:-/home/${USER}}
 
-	xauth nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTHORITY} nmerge -
+test -f ${XAUTHORITY} && true || touch ${XAUTHORITY}
 
-	docker exec -it --env="DISPLAY" --env="XAUTHORITY=${XAUTHORITY}"  ${CONTAINER}  /usr/bin/emacsclient -c $@ 
-fi
+OPTS="-v ${HOME}:${HOME} \
+     $( [ -d ${XSOCKET} ]    && echo -v ${XSOCKET}:${XSOCKET}:rw ) \
+     $( [ -f ${XAUTHORITY} ] && echo -v ${XAUTHORITY}:${XAUTHORITY}:ro ) \
+     -e XAUTHORITY=${XAUTHORITY} \
+     --user=$(id -un):$(id -gn) \
+     "
+
+status "Finding image..."
+IMAGES=( $(docker image ls --filter "reference=*emacs*" -q) )
+
+[ ${#IMAGES[@]} -eq "0" ] && status "No emacs image found. Exiting." && exit 1
+
+status "Found image ${IMAGE}..."
+
+status "Looking for container that uses ${IMAGE}..."
+
+CONTAINER=$(docker container ls -q -a --last=-1 ${IMAGES[@]/#/--filter ancestor=})
+
+[ -z "${CONTAINER}" ] && status "No container found. Creating container..." \
+       	&& CONTAINER=$(docker container run -d ${OPTS} ${IMAGES}) 
+
+status "Using container ${CONTAINER}..."
+
+eval $(docker container inspect ${CONTAINER} --format='{{with .State}}PAUSED={{.Paused}} RUNNING={{.Running}}{{end}}')
+eval ${RUNNING} || ( status "Starting container..."  && docker container start   ${CONTAINER} > /dev/null )
+eval ${PAUSED}  && ( status "Unpausing container..." && docker container unpause ${CONTAINER} > /dev/null )
+
+xauth nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTHORITY} nmerge -
+
+LIVE=0
+until [ ${LIVE} -gt "0" ]; do
+  docker container exec -t --env="DISPLAY" --env="XAUTHORITY=${XAUTHORITY}"  ${CONTAINER}  /usr/bin/emacsclient -c $@ && LIVE=1 || LIVE=0
+  [ ${LIVE} -eq "0" ] && status "Retrying..." && sleep 5
+done
+
+CLIENTS=$( docker container exec ${CONTAINER} ps -o comm | grep -s -c emacsclient || true)
+[ ${CLIENTS} -eq "0" ]  && status "No more clients pausing ${CONTAINER}" && docker container pause ${CONTAINER} > /dev/null 
+
