@@ -11,13 +11,18 @@ status(){
 
 error_exit(){
   if [ $? -ne "0" ]; then
-    status "${PREV} failed with exit code $? $(kill -l ${SIG})"
+    status "${PREV} failed with exit code $?"
     exit 1
   fi
 }
 
 trap error_exit EXIT
 
+EMACSCLIENTS=( $(which -a emacsclient) )
+EMACSCLIENT=( ${EMACSCLIENTS[@]#${0}} )
+if [ -n ${EMACSCLIENT} ]; then
+  ${EMACSCLIENT} -c $@ && exit $? || exit $?
+fi
 
 XAUTHORITY=/tmp/.docker.xauth
 XSOCKET=/tmp/.X11-unix
