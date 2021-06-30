@@ -20,7 +20,7 @@ trap error_exit EXIT
 
 EMACSCLIENTS=( $(which -a emacsclient) )
 EMACSCLIENT=( ${EMACSCLIENTS[@]#${0}} )
-if [ -n ${EMACSCLIENT} ]; then
+if [ ${#EMACSCLIENT[@]} -ne "0" ]; then
   ${EMACSCLIENT} -c $@ && exit $? || exit $?
 fi
 
