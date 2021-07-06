@@ -34,9 +34,16 @@ test -f ${XAUTHORITY} && true || touch ${XAUTHORITY}
 OPTS="-v ${HOME}:${HOME} \
      $( [ -d ${XSOCKET} ]    && echo -v ${XSOCKET}:${XSOCKET}:rw ) \
      $( [ -f ${XAUTHORITY} ] && echo -v ${XAUTHORITY}:${XAUTHORITY}:ro ) \
+     -v ${BROWSER}:${BROWSER} \
      -e XAUTHORITY=${XAUTHORITY} \
+     -e BROWSER=${BROWSER} \
      --user=$(id -un):$(id -gn) \
      "
+
+CLIENT_OPTS="-e DISPLAY=${DISPLAY} \
+             -e XAUTHORITY=${XAUTHORITY} \
+             -e BROWSER=${BROWSER} \
+             " 
 
 status "Finding image..."
 IMAGES=( $(docker image ls --filter "reference=*emacs*" -q) )
@@ -62,7 +69,7 @@ xauth nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTHORITY} nmerge 
 
 LIVE=0
 until [ ${LIVE} -gt "0" ]; do
-  docker container exec -t --env="DISPLAY" --env="XAUTHORITY=${XAUTHORITY}"  ${CONTAINER}  /usr/bin/emacsclient -c $@ && LIVE=1 || LIVE=0
+  docker container exec -t ${CLIENT_OPTS} ${CONTAINER}  /usr/bin/emacsclient -c $@ && LIVE=1 || LIVE=0
   [ ${LIVE} -eq "0" ] && status "Retrying..." && sleep 5
 done
 
