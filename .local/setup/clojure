@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+set -x
+
+CLOJURE_DEPS_REPO=https://github.com/practicalli/clojure-deps-edn.git
+CLOJURE_VERSION=${1:-1.10.2.774}
+
+PREFIX=${HOME}/.local
+BIN=${PREFIX}/bin
+
+WORK=$(mktemp -d)
+
+echo "Installing to ${PREFIX}"
+
+cd ${WORK}
+
+sudo apt update \
+  && sudo apt install -y git openssh-server openssh-client openjdk-11-jdk openjdk-11-dbg openjdk-11-jre \
+     curl unzip
+
+curl -O "https://download.clojure.org/install/linux-install-${CLOJURE_VERSION}.sh"
+chmod +x "linux-install-${CLOJURE_VERSION}.sh" 
+./linux-install-${CLOJURE_VERSION}.sh --prefix ${PREFIX}
+
+git clone --depth 1 "${CLOJURE_DEPS_REPO}" ~/.clojure/ 
+curl -sLO https://raw.githubusercontent.com/clj-kondo/clj-kondo/master/script/install-clj-kondo
+chmod +x install-clj-kondo 
+./install-clj-kondo --dir ${BIN} --download-dir ${WORK} 
+curl -sLO "https://github.com/clojure-lsp/clojure-lsp/releases/latest/download/clojure-lsp-native-linux-amd64.zip" 
+unzip clojure-lsp-native-linux-amd64.zip -d ${BIN} 
+chmod u+x ${BIN}/clojure-lsp
+( cd ${BIN} && curl -sLO https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein ) 
+chmod a+x ${BIN}/lein 
+lein 
+
+rm -rf ${WORK}
