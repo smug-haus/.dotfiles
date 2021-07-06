@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+sudo apt-get install software-properties-common
+sudo apt-get update
+wget -q http://emacs.ganneff.de/apt.key -O- | sudo apt-key add
+sudo add-apt-repository "deb http://emacs.ganneff.de/ buster main"
+sudo apt-get update
+sudo apt-get install emacs-snapshot
+sudo update-alternatives --config emacsclient
