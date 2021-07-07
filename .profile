@@ -8,6 +8,29 @@
 # for ssh logins, install and configure the libpam-umask package.
 #umask 022
 
+function _platform() {
+  if [ -n "${WSLENV}" ]; then
+    HOST_PLATFORM=WSL
+}
+
+function _display() {
+  
+  if [ -n "${WSLENV}" ]; then
+    # Are we in WSL?
+    DISPLAY=${DISPLAY:-$(cat /etc/resolv.conf | grep name | cut -d' ' -f2):0.0}
+
+  elif [ -n "$(cat /proc/1/sched | head -n 1 | grep -E '^(init|systemd)' )"]; then
+    # do the socket thing
+    true
+  else
+    DISPLAY=${DISPLAY:-0}
+  fi
+
+  echo $DISPLAY
+}
+
+
+
 # if running bash
 if [ -n "$BASH_VERSION" ]; then
     # include .bashrc if it exists
@@ -26,11 +49,11 @@ if [ -d "$HOME/.local/bin" ] ; then
     PATH="$HOME/.local/bin:$PATH"
 fi
 
-export DISPLAY=$(cat /etc/resolv.conf | grep name | cut -d' ' -f2):0.0
+export DISPLAY=$( _display )
 
 export SSH_AUTH_SOCK=$HOME/.ssh/agent.sock
-ss -a | grep -q $SSH_AUTH_SOCK
-if [ $? -ne 0   ]; then
+
+if [ -x "$( ss -a | grep -q ${SSH_AUTH_SOCK} )"  ]; then
   rm -f $SSH_AUTH_SOCK
   ( setsid socat UNIX-LISTEN:$SSH_AUTH_SOCK,fork EXEC:'/mnt/c/Program\\ Files/wsl-ssh-agent/npiperelay.exe -ei -s //./pipe/openssh-ssh-agent',nofork & ) >/dev/null 2>&1
 fi
